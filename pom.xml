@@ -26,6 +26,19 @@
     <maven.compiler.target>1.8</maven.compiler.target>
   </properties>
 
+  <distributionManagement>
+    <repository>
+      <id>pentaho.public.release.repo</id>
+      <name>Pentaho Public Release Repository</name>
+      <url>${pentaho.public.release.repo}</url>
+    </repository>
+    <snapshotRepository>
+      <id>pentaho.public.snapshot.repo</id>
+      <name>Pentaho Public Snapshot Repository</name>
+      <url>${pentaho.public.snapshot.repo}</url>
+    </snapshotRepository>
+  </distributionManagement>
+         
   <build>
     <pluginManagement>
       <plugins>
