@@ -4,7 +4,7 @@
 
 This module creates a **custom shaded Netty JAR** that:
 
-1. Packages Netty 4.1.128.Final (which fixes CVE-2025-59419 SMTP injection)
+1. Packages Netty 4.1.133.Final (which fixes CVE-2025-59419 SMTP injection)
 2. Relocates all Netty packages to match HBase's expected namespace
 3. Replaces the vulnerable `hbase-shaded-netty:4.1.10` dependency
 
@@ -20,10 +20,10 @@ This matches exactly what Apache HBase's `hbase-shaded-netty` does, ensuring **1
 ## CVE-2025-59419 Details
 
 - **Vulnerability**: SMTP command injection via CRLF in `netty-codec-smtp`
-- **Affected Versions**: Netty < 4.1.128.Final
-- **Fix Version**: Netty >= 4.1.128.Final
+- **Affected Versions**: Netty < 4.1.133.Final
+- **Fix Version**: Netty >= 4.1.133.Final
 - **Old Dependency**: `hbase-shaded-netty:4.1.10` contains Netty 4.1.116.Final (VULNERABLE)
-- **New Dependency**: `pentaho-shaded-netty` contains Netty 4.1.128.Final (FIXED)
+- **New Dependency**: `pentaho-shaded-netty` contains Netty 4.1.133.Final (FIXED)
 
 ## Why This Approach Works
 
@@ -214,6 +214,6 @@ The shaded JAR includes metadata:
 
 ```
 Implementation-Title: Pentaho Shaded Netty
-Shaded-Netty-Version: 4.1.128.Final
+Shaded-Netty-Version: 4.1.133.Final
 CVE-Fix: CVE-2025-59419
 ```
