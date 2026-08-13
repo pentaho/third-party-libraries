@@ -1,0 +1,45 @@
+name: Publish Maven Artifacts
+
+on:
+  pull_request:
+    branches:
+      - master
+    types:
+      - closed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-maven-artifacts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.event.pull_request.merged == true
+    runs-on: [k8s]
+
+    container:
+      image: ${{ vars.ARTIFACTORY_HOST }}/docker/jenkins-build/maven/open-jdk/17
+      credentials:
+        username: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+        password: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
+      volumes:
+        - /home/runner/caches/pentaho/.m2:/root/.m2
+
+    steps:
+      - name: Checkout merged revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      - name: Retrieve Maven settings
+        id: common-maven
+        uses: pentaho/actions-common@stable
+
+      - name: Configure Maven settings
+        shell: sh
+        run: cp "${{ steps.common-maven.outputs.settings-file-path }}" /root/.m2/settings.xml
+
+      - name: Build and publish
+        run: mvn --batch-mode --errors clean deploy
