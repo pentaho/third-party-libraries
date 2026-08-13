@@ -4,7 +4,7 @@
 
 This module creates a **custom shaded Netty JAR** that:
 
-1. Packages Netty ${netty.version}
+1. Packages the Netty version configured in `pom.xml`
 2. Relocates all Netty packages to match HBase's expected namespace
 3. Replaces the `hbase-shaded-netty:4.1.10` dependency
 
@@ -19,10 +19,10 @@ This matches exactly what Apache HBase's `hbase-shaded-netty` does, ensuring **1
 
 ## Version Details
 
-- **Upstream Netty Version**: ${netty.version}
-- **Pentaho Wrapper Version**: `${netty.version}-pentaho-1`
+- **Upstream Netty Version**: `<netty-version>` configured in `pom.xml`
+- **Pentaho Wrapper Version**: `<netty-version>-pentaho-<revision>`
 - **Old Dependency**: `hbase-shaded-netty:4.1.10`
-- **New Dependency**: `pentaho-shaded-netty` containing Netty ${netty.version}
+- **New Dependency**: `pentaho-shaded-netty` containing the configured Netty version
 
 The JAR records the embedded Netty version as `Shaded-Netty-Version`. Dependabot
 checks `io.netty:netty-all` weekly for patch updates.
@@ -89,7 +89,7 @@ mvn clean install
 
 This creates:
 
-- `pentaho-shaded-netty-<netty-version>-pentaho-<revision>.jar` (~7MB)
+- `pentaho-shaded-netty-<revision>.jar` (~7MB)
 - Contains all Netty modules with relocated packages
 - Installs to local Maven repo
 
@@ -217,5 +217,5 @@ The shaded JAR includes metadata:
 
 ```
 Implementation-Title: Pentaho Shaded Netty
-Shaded-Netty-Version: ${netty.version}
+Shaded-Netty-Version: <netty-version>
 ```
