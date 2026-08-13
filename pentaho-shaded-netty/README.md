@@ -1,12 +1,12 @@
-# Pentaho Shaded Netty - CVE-2025-59419 Fix
+# Pentaho Shaded Netty
 
 ## What This Module Does
 
 This module creates a **custom shaded Netty JAR** that:
 
-1. Packages Netty 4.1.135.Final (which fixes CVE-2025-59419 SMTP injection)
+1. Packages Netty ${netty.version}
 2. Relocates all Netty packages to match HBase's expected namespace
-3. Replaces the vulnerable `hbase-shaded-netty:4.1.10` dependency
+3. Replaces the `hbase-shaded-netty:4.1.10` dependency
 
 ## Package Relocation
 
@@ -17,13 +17,15 @@ Relocated to:       org.apache.hadoop.hbase.thirdparty.io.netty.*
 
 This matches exactly what Apache HBase's `hbase-shaded-netty` does, ensuring **100% compatibility** with HBase client code.
 
-## CVE-2025-59419 Details
+## Version Details
 
-- **Vulnerability**: SMTP command injection via CRLF in `netty-codec-smtp`
-- **Affected Versions**: Netty < 4.1.133.Final
-- **Fix Version**: Netty >= 4.1.135.Final
-- **Old Dependency**: `hbase-shaded-netty:4.1.10` contains Netty 4.1.116.Final (VULNERABLE)
-- **New Dependency**: `pentaho-shaded-netty` contains Netty 4.1.135.Final (FIXED)
+- **Upstream Netty Version**: ${netty.version}
+- **Pentaho Wrapper Version**: `${netty.version}-pentaho-1`
+- **Old Dependency**: `hbase-shaded-netty:4.1.10`
+- **New Dependency**: `pentaho-shaded-netty` containing Netty ${netty.version}
+
+The JAR records the embedded Netty version as `Shaded-Netty-Version`. Dependabot
+checks `io.netty:netty-all` weekly for patch updates.
 
 ## Why This Approach Works
 
@@ -52,7 +54,7 @@ Spark/YARN Dependencies:
 │   └── Classes at: io.netty.*
 
 Pentaho Shaded Netty:
-├── org.pentaho.hadoop.shims:pentaho-shaded-netty
+├── org.pentaho.hadoop:pentaho-shaded-netty
 │   └── Classes at: org.apache.hadoop.hbase.thirdparty.io.netty.*
 
 Result: ✅ NO CONFLICT - Different package namespaces
@@ -81,13 +83,13 @@ Our shaded JAR provides exactly these packages after relocation.
 ### Build the Module
 
 ```bash
-cd pentaho-hadoop-shims/pentaho-shaded-netty
+cd third-party-libraries
 mvn clean install
 ```
 
 This creates:
 
-- `pentaho-shaded-netty-11.1.0.0-SNAPSHOT.jar` (~7MB)
+- `pentaho-shaded-netty-<netty-version>-pentaho-<revision>.jar` (~7MB)
 - Contains all Netty modules with relocated packages
 - Installs to local Maven repo
 
@@ -95,7 +97,7 @@ This creates:
 
 ```bash
 # Extract JAR
-unzip -l target/pentaho-shaded-netty-11.1.0.0-SNAPSHOT.jar | grep smtp
+unzip -l pentaho-shaded-netty/target/pentaho-shaded-netty-*.jar | grep smtp
 
 # Should see paths like:
 org/apache/hadoop/hbase/thirdparty/io/netty/handler/codec/smtp/
@@ -105,7 +107,7 @@ org/apache/hadoop/hbase/thirdparty/io/netty/handler/codec/smtp/
 
 **File**: `shims/emr770/pmr/pom.xml`
 
-**Before** (vulnerable):
+**Before**:
 
 ```xml
 <dependency>
@@ -115,13 +117,12 @@ org/apache/hadoop/hbase/thirdparty/io/netty/handler/codec/smtp/
 </dependency>
 ```
 
-**After** (fixed):
+**After** (version managed by `pentaho-hadoop-shims/pom.xml`):
 
 ```xml
 <dependency>
-  <groupId>org.pentaho.hadoop.shims</groupId>
+  <groupId>org.pentaho.hadoop</groupId>
   <artifactId>pentaho-shaded-netty</artifactId>
-  <version>${project.version}</version>
 </dependency>
 ```
 
@@ -147,7 +148,7 @@ org/apache/hadoop/hbase/thirdparty/io/netty/handler/codec/smtp/
 4. **Security Scan**:
 
    ```bash
-   # JFrog Xray scan should show CVE-2025-59419 FIXED
+  # Confirm the embedded Netty version is no longer flagged.
    ```
 
 ## Maintenance
@@ -161,6 +162,7 @@ To upgrade to future Netty versions:
    ```xml
    <properties>
      <netty.version>4.1.XXX.Final</netty.version>
+     <revision>${netty.version}-pentaho-N</revision>
    </properties>
    ```
 
@@ -170,7 +172,8 @@ To upgrade to future Netty versions:
    mvn clean install
    ```
 
-3. No other changes needed - the shading plugin handles everything
+3. Update the centrally managed wrapper version in `pentaho-hadoop-shims` and
+  rebuild the affected shims.
 
 ### Updating Other HBase ThirdParty JARs
 
@@ -214,6 +217,5 @@ The shaded JAR includes metadata:
 
 ```
 Implementation-Title: Pentaho Shaded Netty
-Shaded-Netty-Version: 4.1.135.Final
-CVE-Fix: CVE-2025-59419
+Shaded-Netty-Version: ${netty.version}
 ```
