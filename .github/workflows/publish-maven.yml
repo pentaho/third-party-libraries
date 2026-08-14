@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+env:
+  THIRD_PARTY_MAVEN_REPOSITORY_URL: https://${{ secrets.PENTAHO_CICD_ONE_USER }}:${{ secrets.PENTAHO_CICD_ONE_KEY }}@repo.pentaho.com/artifactory/pntpub-maven-3rdparty-release
+  THIRD_PARTY_BUNDLE_WRAPS_REPOSITORY_URL: https://${{ secrets.PENTAHO_CICD_ONE_USER }}:${{ secrets.PENTAHO_CICD_ONE_KEY }}@repo.pentaho.com/artifactory/third-party-bundle-wraps
+
 concurrency:
   group: publish-maven-artifacts
   cancel-in-progress: false
@@ -41,5 +45,12 @@ jobs:
         shell: sh
         run: cp "${{ steps.common-maven.outputs.settings-file-path }}" /root/.m2/settings.xml
 
-      - name: Build and publish
-        run: mvn --batch-mode --errors clean deploy
+      - name: Build and publish to third-party Maven repository
+        run: >
+          mvn --batch-mode --errors clean deploy
+          -DaltDeploymentRepository=third-party-maven::default::${{ env.THIRD_PARTY_MAVEN_REPOSITORY_URL }}
+
+      - name: Publish to third-party bundle wraps repository
+        run: >
+          mvn --batch-mode --errors deploy
+          -DaltDeploymentRepository=third-party-bundle-wraps::default::${{ env.THIRD_PARTY_BUNDLE_WRAPS_REPOSITORY_URL }}
