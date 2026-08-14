@@ -24,7 +24,7 @@ jobs:
     runs-on: [k8s]
 
     container:
-      image: ${{ vars.ARTIFACTORY_HOST }}/docker/jenkins-build/maven/open-jdk/17
+      image: ${{ vars.ARTIFACTORY_HOST }}/devops-docker-release/pentaho/actions-common:20240305.137
       credentials:
         username: ${{ secrets.PENTAHO_CICD_ONE_USER }}
         password: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
@@ -36,6 +36,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
 
       - name: Retrieve Maven settings
         id: common-maven
@@ -45,12 +46,26 @@ jobs:
         shell: sh
         run: cp "${{ steps.common-maven.outputs.settings-file-path }}" /root/.m2/settings.xml
 
+      - name: Prepare changed module releases
+        id: release-modules
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
+        run: >
+          .github/scripts/prepare-release-modules.sh
+          "${{ github.event.pull_request.base.sha }}"
+          "${{ github.event.pull_request.merge_commit_sha }}"
+
       - name: Build and publish to third-party Maven repository
+        if: steps.release-modules.outputs.modules != ''
         run: >
           mvn --batch-mode --errors clean deploy
+          -pl "${{ steps.release-modules.outputs.modules }}"
           -DaltDeploymentRepository=third-party-maven::default::${{ env.THIRD_PARTY_MAVEN_REPOSITORY_URL }}
 
       - name: Publish to third-party bundle wraps repository
+        if: steps.release-modules.outputs.modules != ''
         run: >
           mvn --batch-mode --errors deploy
+          -pl "${{ steps.release-modules.outputs.modules }}"
           -DaltDeploymentRepository=third-party-bundle-wraps::default::${{ env.THIRD_PARTY_BUNDLE_WRAPS_REPOSITORY_URL }}

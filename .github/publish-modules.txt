@@ -1,0 +1,2 @@
+# Maven module paths eligible for release publishing.
+pentaho-shaded-netty
