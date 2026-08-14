@@ -1,18 +1,17 @@
 name: Publish Maven Artifacts
 
 on:
-  pull_request:
+  push:
     branches:
       - master
-    types:
-      - closed
 
 permissions:
   contents: read
 
 env:
-  THIRD_PARTY_MAVEN_REPOSITORY_URL: https://${{ secrets.PENTAHO_CICD_ONE_USER }}:${{ secrets.PENTAHO_CICD_ONE_KEY }}@repo.pentaho.com/artifactory/pntpub-maven-3rdparty-release
-  THIRD_PARTY_BUNDLE_WRAPS_REPOSITORY_URL: https://${{ secrets.PENTAHO_CICD_ONE_USER }}:${{ secrets.PENTAHO_CICD_ONE_KEY }}@repo.pentaho.com/artifactory/third-party-bundle-wraps
+  PUBLIC_RELEASE_REPO_URL: https://${{ vars.ARTIFACTORY_HOST }}/artifactory/pntpub-maven-3rdparty-release
+  NEXUS_DEPLOY_USER: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+  NEXUS_DEPLOY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
 
 concurrency:
   group: publish-maven-artifacts
@@ -20,11 +19,10 @@ concurrency:
 
 jobs:
   publish:
-    if: github.event.pull_request.merged == true
     runs-on: [k8s]
 
     container:
-      image: ${{ vars.ARTIFACTORY_HOST }}/devops-docker-release/pentaho/actions-common:20240305.137
+      image: ${{ vars.PDIA_AC_CONTAINER_IMAGE }}
       credentials:
         username: ${{ secrets.PENTAHO_CICD_ONE_USER }}
         password: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
@@ -33,9 +31,9 @@ jobs:
 
     steps:
       - name: Checkout merged revision
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Retrieve Maven settings
@@ -53,19 +51,10 @@ jobs:
           ARTIFACTORY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
         run: >
           .github/scripts/prepare-release-modules.sh
-          "${{ github.event.pull_request.base.sha }}"
-          "${{ github.event.pull_request.merge_commit_sha }}"
+          "${{ github.event.before }}"
+          "${{ github.sha }}"
 
       - name: Build and publish to third-party Maven repository
         if: steps.release-modules.outputs.modules != ''
         run: >
-          mvn --batch-mode --errors clean deploy
-          -pl "${{ steps.release-modules.outputs.modules }}"
-          -DaltDeploymentRepository=third-party-maven::default::${{ env.THIRD_PARTY_MAVEN_REPOSITORY_URL }}
-
-      - name: Publish to third-party bundle wraps repository
-        if: steps.release-modules.outputs.modules != ''
-        run: >
-          mvn --batch-mode --errors deploy
-          -pl "${{ steps.release-modules.outputs.modules }}"
-          -DaltDeploymentRepository=third-party-bundle-wraps::default::${{ env.THIRD_PARTY_BUNDLE_WRAPS_REPOSITORY_URL }}
+          mvn --batch-mode --errors clean deploy -pl "${{ steps.release-modules.outputs.modules }}"
