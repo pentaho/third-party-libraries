@@ -33,28 +33,55 @@ jobs:
       - name: Checkout merged revision
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
+          # The change detector only needs the pushed commit and its predecessor.
+          fetch-depth: 2
+
+      - name: Determine changed Maven modules
+        id: change-detection
+        uses: hv-actions/change-detection-builder@stable
+        with:
+          exclude_paths: '.yaml, .yml, .github/, README.md'
+
+      - name: Select publishable modules
+        id: publish-modules
+        shell: bash
+        env:
+          CHANGED_MODULES: ${{ steps.change-detection.outputs.changed_modules }}
+        run: |
+          selected=()
+          while IFS= read -r module || [[ -n "$module" ]]; do
+            [[ -z "$module" || "$module" == \#* ]] && continue
+            while IFS= read -r changed_module; do
+              changed_module=${changed_module#./}
+              # The shared action uses "." when no Maven module is identified.
+              # Publish only explicitly changed, allowlisted artifact modules.
+              if [[ "$changed_module" == "$module" ]]; then
+                selected+=("$module")
+                break
+              fi
+            done < <(tr ',' '\n' <<< "$CHANGED_MODULES" | xargs -n1)
+          done < .github/publish-modules.txt
+          IFS=,
+          echo "modules=${selected[*]}" >> "$GITHUB_OUTPUT"
 
       - name: Retrieve Maven settings
+        if: steps.publish-modules.outputs.modules != ''
         id: common-maven
         uses: pentaho/actions-common@stable
 
       - name: Configure Maven settings
+        if: steps.publish-modules.outputs.modules != ''
         shell: sh
         run: cp "${{ steps.common-maven.outputs.settings-file-path }}" /root/.m2/settings.xml
 
-      - name: Prepare changed module releases
-        id: release-modules
+      - name: Prepare module release versions
+        if: steps.publish-modules.outputs.modules != ''
         env:
           ARTIFACTORY_USERNAME: ${{ secrets.PENTAHO_CICD_ONE_USER }}
           ARTIFACTORY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
-        run: >
-          .github/scripts/prepare-release-modules.sh
-          "${{ github.event.before }}"
-          "${{ github.sha }}"
+        run: .github/scripts/prepare-release-modules.sh "${{ steps.publish-modules.outputs.modules }}"
 
       - name: Build and publish to third-party Maven repository
-        if: steps.release-modules.outputs.modules != ''
+        if: steps.publish-modules.outputs.modules != ''
         run: >
-          mvn --batch-mode --errors clean deploy -pl "${{ steps.release-modules.outputs.modules }}"
+          mvn --batch-mode --errors clean deploy -pl "${{ steps.publish-modules.outputs.modules }}"
