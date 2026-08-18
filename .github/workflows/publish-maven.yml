@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   PUBLIC_RELEASE_REPO_URL: https://${{ vars.ARTIFACTORY_HOST }}/artifactory/pntpub-maven-3rdparty-release
@@ -36,6 +36,7 @@ jobs:
         with:
           # The change detector only needs the pushed commit and its predecessor.
           fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine changed Maven modules
         id: change-detection
@@ -86,3 +87,21 @@ jobs:
         if: steps.publish-modules.outputs.modules != ''
         run: >
           mvn --batch-mode --errors clean deploy -pl "${{ steps.publish-modules.outputs.modules }}"
+
+      - name: Tag released source
+        if: steps.publish-modules.outputs.modules != ''
+        shell: bash
+        env:
+          MODULES: ${{ steps.publish-modules.outputs.modules }}
+        run: |
+          IFS=',' read -r -a modules <<< "$MODULES"
+          for module in "${modules[@]}"; do
+            mvn_evaluate=(mvn --batch-mode --quiet -pl "$module" -DforceStdout help:evaluate)
+            artifact_id=$("${mvn_evaluate[@]}" -Dexpression=project.artifactId)
+            version=$("${mvn_evaluate[@]}" -Dexpression=project.version)
+            tag_name="${artifact_id}-${version}"
+
+            git tag --annotate "$tag_name" --message "Release $tag_name"
+            git push origin "$tag_name"
+            echo "Created tag $tag_name" >> "$GITHUB_STEP_SUMMARY"
+          done
