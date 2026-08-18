@@ -22,21 +22,23 @@
 
   <groupId>org.pentaho.hadoop</groupId>
   <artifactId>pentaho-shaded-netty</artifactId>
+  <version>${revision}</version>
   <packaging>jar</packaging>
 
-  <name>Pentaho Shaded Netty (CVE-2025-59419 Fix)</name>
+  <name>Pentaho Shaded Netty</name>
   <description>
-    Shaded Netty 4.1.135.Final with package relocation for HBase compatibility.
-    Fixes CVE-2025-59419 (SMTP injection vulnerability).
+    Maintained, patched Netty implementation with package relocation for HBase compatibility.
+    This artifact replaces Apache HBase's shaded Netty while preserving the namespace expected by HBase clients.
     
     Package relocation: io.netty.* -> org.apache.hadoop.hbase.thirdparty.io.netty.*
     
-    This JAR replaces org.apache.hbase.thirdparty:hbase-shaded-netty:4.1.10
-    which contains vulnerable Netty 4.1.116.Final.
+    The embedded Netty version is explicitly managed here so each security update produces a new,
+    traceable pentaho-shaded-netty release.
   </description>
 
   <properties>
-    <netty.version>4.1.135.Final</netty.version>
+    <netty.version>4.1.137.Final</netty.version>
+    <revision>${netty.version}-pentaho-1</revision>
   </properties>
 
   <dependencies>
@@ -93,7 +95,6 @@
                     <Implementation-Version>${project.version}</Implementation-Version>
                     <Implementation-Vendor>Pentaho</Implementation-Vendor>
                     <Shaded-Netty-Version>${netty.version}</Shaded-Netty-Version>
-                    <CVE-Fix>CVE-2025-59419</CVE-Fix>
                   </manifestEntries>
                 </transformer>
               </transformers>

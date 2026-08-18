@@ -1,0 +1,141 @@
+name: Publish Maven Artifacts
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print publication commands without deploying or tagging
+        required: false
+        type: boolean
+        default: false
+      modules:
+        description: Comma-separated modules to inspect in a dry run
+        required: false
+        type: string
+        default: pentaho-shaded-netty
+
+permissions:
+  contents: write
+
+env:
+  PUBLIC_RELEASE_REPO_URL: https://${{ vars.ARTIFACTORY_HOST }}/artifactory/pntpub-maven-3rdparty-release
+  NEXUS_DEPLOY_USER: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+  NEXUS_DEPLOY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
+
+concurrency:
+  group: publish-maven-artifacts
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: [k8s]
+
+    container:
+      image: ${{ vars.PDIA_AC_CONTAINER_IMAGE }}
+      credentials:
+        username: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+        password: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
+      volumes:
+        - /home/runner/caches/pentaho/.m2:/root/.m2
+
+    steps:
+      - name: Checkout merged revision
+        uses: actions/checkout@v7
+        with:
+          # The change detector only needs the pushed commit and its predecessor.
+          fetch-depth: 2
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine changed Maven modules
+        id: change-detection
+        uses: hv-actions/change-detection-builder@stable
+        with:
+          exclude_paths: '.yaml, .yml, .github/, README.md'
+
+      - name: Select publishable modules
+        id: publish-modules
+        shell: bash
+        env:
+          CHANGED_MODULES: ${{ steps.change-detection.outputs.changed_modules }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DRY_RUN_MODULES: ${{ inputs.modules }}
+        run: |
+          if [[ "$DRY_RUN" == "true" ]]; then
+            CHANGED_MODULES="$DRY_RUN_MODULES"
+          fi
+
+          selected=()
+          while IFS= read -r module || [[ -n "$module" ]]; do
+            [[ -z "$module" || "$module" == \#* ]] && continue
+            while IFS= read -r changed_module; do
+              changed_module=${changed_module#./}
+              # The shared action uses "." when no Maven module is identified.
+              # Publish only explicitly changed, allowlisted artifact modules.
+              if [[ "$changed_module" == "$module" ]]; then
+                selected+=("$module")
+                break
+              fi
+            done < <(tr ',' '\n' <<< "$CHANGED_MODULES" | xargs -n1)
+          done < .github/publish-modules.txt
+          IFS=,
+          echo "modules=${selected[*]}" >> "$GITHUB_OUTPUT"
+
+      - name: Retrieve Maven settings
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run != true
+        id: common-maven
+        uses: pentaho/actions-common@stable
+
+      - name: Configure Maven settings
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run != true
+        shell: sh
+        run: cp "${{ steps.common-maven.outputs.settings-file-path }}" /root/.m2/settings.xml
+
+      - name: Prepare module release versions
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run != true
+        env:
+          ARTIFACTORY_USERNAME: ${{ secrets.PENTAHO_CICD_ONE_USER }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
+        run: .github/scripts/prepare-release-modules.sh "${{ steps.publish-modules.outputs.modules }}"
+
+      - name: Build and publish to third-party Maven repository
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run != true
+        run: >
+          mvn --batch-mode --errors clean deploy -pl "${{ steps.publish-modules.outputs.modules }}"
+
+      - name: Tag released source
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run != true
+        shell: bash
+        env:
+          MODULES: ${{ steps.publish-modules.outputs.modules }}
+        run: |
+          IFS=',' read -r -a modules <<< "$MODULES"
+          for module in "${modules[@]}"; do
+            mvn_evaluate=(mvn --batch-mode --quiet -pl "$module" -DforceStdout help:evaluate)
+            artifact_id=$("${mvn_evaluate[@]}" -Dexpression=project.artifactId)
+            version=$("${mvn_evaluate[@]}" -Dexpression=project.version)
+            tag_name="${artifact_id}-${version}"
+
+            git tag --annotate "$tag_name" --message "Release $tag_name"
+            git push origin "$tag_name"
+            echo "Created tag $tag_name" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Show publication commands
+        if: steps.publish-modules.outputs.modules != '' && inputs.dry_run == true
+        shell: bash
+        env:
+          MODULES: ${{ steps.publish-modules.outputs.modules }}
+        run: |
+          IFS=',' read -r -a modules <<< "$MODULES"
+          printf 'Prepare versions: .github/scripts/prepare-release-modules.sh %q\n' "$MODULES"
+          printf 'Deploy: mvn --batch-mode --errors clean deploy -pl %q\n' "$MODULES"
+
+          for module in "${modules[@]}"; do
+            printf 'Resolve artifact ID: mvn --batch-mode --quiet -pl %q -DforceStdout help:evaluate -Dexpression=project.artifactId\n' "$module"
+            printf 'Resolve prepared version: mvn --batch-mode --quiet -pl %q -DforceStdout help:evaluate -Dexpression=project.version\n' "$module"
+            echo 'Tag: git tag --annotate <artifactId>-<prepared-version> --message "Release <artifactId>-<prepared-version>"'
+            echo 'Push tag: git push origin <artifactId>-<prepared-version>'
+          done
