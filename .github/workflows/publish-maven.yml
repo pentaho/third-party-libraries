@@ -126,7 +126,7 @@ jobs:
             version=$("${mvn_evaluate[@]}" -Dexpression=project.version)
             tag_name="${artifact_id}-${version}"
 
-            git tag --annotate "$tag_name" --message "Release $tag_name"
+            git tag "$tag_name"
             git push origin "$tag_name"
             echo "Created tag $tag_name" >> "$GITHUB_STEP_SUMMARY"
           done
