@@ -10,7 +10,6 @@
  *
  * Change Date: 2030-06-15
  ******************************************************************************* -->
-<!-- Triggers release-module detection after this workflow configuration update. -->
 <project xmlns="http://maven.apache.org/POM/4.0.0"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
@@ -34,7 +33,7 @@
     Package relocation: io.netty.* -> org.apache.hadoop.hbase.thirdparty.io.netty.*
     
     The embedded Netty version is explicitly managed here so each security update produces a new,
-    traceable pentaho-shaded-netty release.
+    traceable pentaho-shaded-netty release while preserving HBase client compatibility.
   </description>
 
   <properties>
