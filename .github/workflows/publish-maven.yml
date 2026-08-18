@@ -53,13 +53,6 @@ jobs:
           fetch-depth: 2
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Configure Artifactory endpoints
-        shell: bash
-        run: |
-          echo "ARTIFACTORY_BASE_URL=https://${ARTIFACTORY_HOST}/artifactory" >> "$GITHUB_ENV"
-          echo "RESOLVE_REPO_MIRROR=https://${ARTIFACTORY_HOST}/artifactory/pnt-mvn" >> "$GITHUB_ENV"
-          echo "PUBLIC_RELEASE_REPO_URL=https://${ARTIFACTORY_HOST}/artifactory/${PUBLIC_RELEASE_REPO}" >> "$GITHUB_ENV"
-
       - name: Determine changed Maven modules
         id: change-detection
         uses: hv-actions/change-detection-builder@stable
