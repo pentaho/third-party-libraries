@@ -21,11 +21,8 @@ permissions:
   contents: write
 
 env:
-  ARTIFACTORY_HOST: "${{ vars.ARTIFACTORY_HOST }}"
-  ARTIFACTORY_BASE_URL: "https://${ARTIFACTORY_HOST}/artifactory"
-  RESOLVE_REPO_MIRROR: "${ARTIFACTORY_BASE_URL}/pnt-mvn"
-  PUBLIC_RELEASE_REPO: "pntpub-maven-3rdparty-release"
-  PUBLIC_RELEASE_REPO_URL: "${ARTIFACTORY_BASE_URL}/${PUBLIC_RELEASE_REPO}"
+  ARTIFACTORY_HOST: ${{ vars.ARTIFACTORY_HOST }}
+  PUBLIC_RELEASE_REPO: pntpub-maven-3rdparty-release
   NEXUS_DEPLOY_USER: ${{ secrets.PENTAHO_CICD_ONE_USER }}
   NEXUS_DEPLOY_PASSWORD: ${{ secrets.PENTAHO_CICD_ONE_KEY }}
 
@@ -52,6 +49,13 @@ jobs:
           # The change detector only needs the pushed commit and its predecessor.
           fetch-depth: 2
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Artifactory endpoints
+        shell: bash
+        run: |
+          echo "ARTIFACTORY_BASE_URL=https://${ARTIFACTORY_HOST}/artifactory" >> "$GITHUB_ENV"
+          echo "RESOLVE_REPO_MIRROR=https://${ARTIFACTORY_HOST}/artifactory/pnt-mvn" >> "$GITHUB_ENV"
+          echo "PUBLIC_RELEASE_REPO_URL=https://${ARTIFACTORY_HOST}/artifactory/${PUBLIC_RELEASE_REPO}" >> "$GITHUB_ENV"
 
       - name: Determine changed Maven modules
         id: change-detection
