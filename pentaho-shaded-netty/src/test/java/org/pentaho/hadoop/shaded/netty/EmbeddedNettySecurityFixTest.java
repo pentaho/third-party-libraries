@@ -21,12 +21,7 @@ import io.netty.handler.codec.smtp.SmtpResponseDecoder;
 import io.netty.util.CharsetUtil;
 import org.junit.jupiter.api.Test;
 
-import java.io.InputStream;
-import java.io.ByteArrayOutputStream;
-import java.nio.charset.StandardCharsets;
-
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -38,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * shade plugin relocates into the published artifact. They fail on Netty 4.1.137.Final and pass on
  * 4.1.138.Final, so they are a real regression guard rather than a restatement of the version
  * property.</p>
+ *
+ * <p>The OCSP half of this upgrade is guarded behaviourally by {@code OcspResponderAuthorizationTest},
+ * and the published jar is re-checked after shading by {@code ShadedArtifactSecurityIT}.</p>
  */
 class EmbeddedNettySecurityFixTest {
 
@@ -47,9 +45,6 @@ class EmbeddedNettySecurityFixTest {
    * mirrored here; the tests below straddle it from both sides.
    */
   private static final int DEFAULT_MAX_RESPONSE_SIZE = 64 * 1024;
-
-  /** OID id-kp-OCSPSigning -- the Extended Key Usage an OCSP responder certificate must carry. */
-  private static final String ID_KP_OCSP_SIGNING_OID = "1.3.6.1.5.5.7.3.9";
 
   private static EmbeddedChannel smtpChannel() {
     return new EmbeddedChannel( new SmtpResponseDecoder( 1024 ) );
@@ -125,46 +120,6 @@ class EmbeddedNettySecurityFixTest {
         "a line beyond maxLineLength should still be rejected" );
 
     channel.finishAndReleaseAll();
-  }
-
-  /**
-   * The OCSP client must verify the id-kp-OCSPSigning Extended Key Usage on a delegated responder
-   * certificate; without it, any certificate signed by the issuer can forge a "good" status and
-   * defeat revocation checking.
-   *
-   * <p>The check lives in code reached only by a full OCSP exchange against a live responder, which
-   * is not something this repackaging module can stand up. The guard therefore asserts on the
-   * compiled class itself: the OID and the rejection message appear in the constant pool of
-   * {@code OcspClient} only once the check exists. A negative control on an OID that must never be
-   * present keeps the assertion from passing vacuously.</p>
-   */
-  @Test
-  void ocspResponderCertificateEkuIsVerified() throws Exception {
-    String classBytes = constantPoolText( "io/netty/handler/ssl/ocsp/OcspClient.class" );
-
-    assertTrue( classBytes.contains( ID_KP_OCSP_SIGNING_OID ),
-        "OcspClient does not reference id-kp-OCSPSigning (" + ID_KP_OCSP_SIGNING_OID
-            + ") -- the embedded Netty is missing the OCSP responder EKU check (fixed in 4.1.138.Final)" );
-    assertTrue( classBytes.contains( "OCSP Responder is not authorized to sign OCSP responses" ),
-        "the OCSP responder authorization failure path is absent from the embedded Netty" );
-
-    // Negative control: an OID that is not part of this check must not be found, proving the
-    // assertion above is actually reading the constant pool and not matching everything.
-    assertFalse( classBytes.contains( "1.3.6.1.5.5.7.3.99" ),
-        "constant-pool scan matched an OID that should not be present -- the guard is vacuous" );
-  }
-
-  private static String constantPoolText( String resource ) throws Exception {
-    try ( InputStream in = EmbeddedNettySecurityFixTest.class.getClassLoader().getResourceAsStream( resource ) ) {
-      assertNotNull( in, "class not found on the test classpath: " + resource );
-      ByteArrayOutputStream out = new ByteArrayOutputStream();
-      byte[] buf = new byte[ 8192 ];
-      int read;
-      while ( ( read = in.read( buf ) ) != -1 ) {
-        out.write( buf, 0, read );
-      }
-      return new String( out.toByteArray(), StandardCharsets.ISO_8859_1 );
-    }
   }
 
   private static String repeat( char c, int times ) {
