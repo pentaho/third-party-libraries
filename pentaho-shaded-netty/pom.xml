@@ -37,8 +37,12 @@
   </description>
 
   <properties>
-    <netty.version>4.1.137.Final</netty.version>
+    <netty.version>4.1.138.Final</netty.version>
     <revision>${netty.version}-pentaho-1</revision>
+    <junit.jupiter.version>5.10.2</junit.jupiter.version>
+    <maven.surefire.version>3.2.5</maven.surefire.version>
+    <maven.failsafe.version>3.2.5</maven.failsafe.version>
+    <bouncycastle.version>1.70</bouncycastle.version>
   </properties>
 
   <dependencies>
@@ -48,10 +52,62 @@
       <artifactId>netty-all</artifactId>
       <version>${netty.version}</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.jupiter.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Netty's OCSP support is compiled against BouncyCastle; the OCSP guard needs it on the
+         test classpath to build the certificates and signed response it drives the check with. -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcpkix-jdk15on</artifactId>
+      <version>${bouncycastle.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk15on</artifactId>
+      <version>${bouncycastle.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <!-- Run the embedded-Netty security guards -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+      </plugin>
+
+      <!-- Re-assert the same security properties against the jar that is actually published,
+           after the shade plugin has run, so a packaging or relocation regression cannot ship a
+           vulnerable artifact past the green unit tests. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>${maven.failsafe.version}</version>
+        <configuration>
+          <systemPropertyVariables>
+            <shaded.artifact>${project.build.directory}/${project.build.finalName}.jar</shaded.artifact>
+            <netty.version>${netty.version}</netty.version>
+          </systemPropertyVariables>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
       <!-- Maven Shade Plugin - Creates the shaded JAR with package relocation -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
