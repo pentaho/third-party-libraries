@@ -37,7 +37,7 @@
   </description>
 
   <properties>
-    <netty.version>4.1.137.Final</netty.version>
+    <netty.version>4.1.138.Final</netty.version>
     <revision>${netty.version}-pentaho-1</revision>
   </properties>
 
