@@ -37,7 +37,7 @@
   </description>
 
   <properties>
-    <netty.version>4.1.138.Final</netty.version>
+    <netty.version>4.1.140.Final</netty.version>
     <revision>${netty.version}-pentaho-1</revision>
     <junit.jupiter.version>5.10.2</junit.jupiter.version>
     <maven.surefire.version>3.2.5</maven.surefire.version>
